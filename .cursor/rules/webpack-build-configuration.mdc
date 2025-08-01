@@ -1,0 +1,110 @@
+# Webpack 构建配置
+
+## 多浏览器构建
+Obsidian Clipper 使用单一 Webpack 配置支持三个浏览器平台：
+
+### 环境变量
+- `BROWSER=chrome` - Chrome/Chromium 浏览器
+- `BROWSER=firefox` - Firefox 浏览器  
+- `BROWSER=safari` - Safari 浏览器
+
+### 输出目录
+- Chrome: `dist/` (生产) / `dev/` (开发)
+- Firefox: `dist_firefox/` (生产) / `dev_firefox/` (开发)
+- Safari: `dist_safari/` (生产) / `dev_safari/` (开发)
+
+## 入口点配置
+参考 [webpack.config.js](mdc:webpack.config.js) 中的入口配置：
+- `popup` - 弹出窗口
+- `settings` - 设置页面
+- `content` - 内容脚本
+- `background` - 后台脚本
+- `style` - 主样式
+- `highlighter` - 高亮器样式
+- `reader` - 阅读器样式
+- `reader-script` - 阅读器脚本
+
+## 构建优化
+- 生产模式启用代码压缩和混淆
+- 使用 `TerserPlugin` 进行 JavaScript 压缩
+- 启用 `source-map` 用于开发调试
+- 使用 `MiniCssExtractPlugin` 提取 CSS
+
+## 插件配置
+- `CopyPlugin` - 复制静态资源
+- `MiniCssExtractPlugin` - CSS 提取
+- `ZipPlugin` - 打包扩展文件
+- `TerserPlugin` - 代码压缩
+
+## 路径解析
+- 配置 TypeScript 路径映射
+- 使用 `webextension-polyfill` 别名
+- 支持 `.ts` 和 `.js` 文件扩展名
+
+## 开发模式
+- 启用 `--watch` 模式进行热重载
+- 使用 `source-map` 进行调试
+- 禁用代码压缩以加快构建速度
+
+## 生产模式
+- 启用代码压缩和混淆
+- 禁用 source map
+- 优化模块和块 ID 命名
+
+## 构建命令
+```bash
+# 开发模式
+npm run dev:chrome    # Chrome 开发
+npm run dev:firefox   # Firefox 开发
+npm run dev:safari    # Safari 开发
+
+# 生产构建
+npm run build:chrome  # Chrome 生产
+npm run build:firefox # Firefox 生产
+npm run build:safari  # Safari 生产
+npm run build         # 构建所有平台
+```
+
+## 配置示例
+```javascript
+// 浏览器特定配置
+const getBrowserConfig = (browser) => {
+  const configs = {
+    chrome: {
+      manifest: 'src/manifest.chrome.json',
+      output: 'dist'
+    },
+    firefox: {
+      manifest: 'src/manifest.firefox.json', 
+      output: 'dist_firefox'
+    },
+    safari: {
+      manifest: 'src/manifest.safari.json',
+      output: 'dist_safari'
+    }
+  };
+  return configs[browser];
+};
+
+// 优化配置
+const optimization = {
+  minimize: isProduction,
+  minimizer: [
+    new TerserPlugin({
+      terserOptions: {
+        mangle: false,
+        compress: {
+          defaults: true,
+          global_defs: {
+            DEBUG_MODE: !isProduction
+          }
+        }
+      }
+    })
+  ]
+};
+```
+description:
+globs:
+alwaysApply: false
+---

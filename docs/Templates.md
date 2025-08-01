@@ -60,6 +60,34 @@ You can trigger templates based on [schema.org](https://schema.org/) data presen
 
 Schema.org values can also be used to [[Variables#Schema.org variables|pre-populate data in templates]].
 
+### Enhanced Template Triggers (New)
+
+For more advanced template triggering, you can use the enhanced trigger system that supports complex conditions and multiple match types. See [[Enhanced-Template-Triggers|Enhanced Template Triggers]] for detailed documentation.
+
+#### Key Features
+
+- **Combined Conditions**: Use `AND` and `OR` operators to combine multiple conditions
+- **Multiple Match Types**: URL, title, DOM elements, metadata, and time-based matching
+- **Wildcard Support**: Use `*` wildcards in URL patterns
+- **Advanced Schema.org Queries**: Complex structured data matching
+- **Time Conditions**: Trigger based on time or date
+
+#### Examples
+
+```
+# Simple combined condition
+url:https://tech.example.com AND title:contains("技术")
+
+# Complex nested conditions
+(url:https://blog.com OR url:https://news.com) AND schema:@Article
+
+# Time-based triggering
+time:between(09:00,18:00) AND schema:@NewsArticle
+
+# DOM element matching
+selector:.article-content AND title:contains("重要")
+```
+
 ### Interpreter context
 
 When [[Interpret web pages|Interpreter]] is enabled, you can use [[Variables#Prompt variables|prompt variables]] to extract page content with natural language. For each template you can define the [[Interpret web pages#Context|context]] that Interpreter has access too. 

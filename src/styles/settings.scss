@@ -265,10 +265,83 @@
 		margin: 0.5rem 0.375rem;
 	}
 
+	#batch-mode-toggle-btn {
+		width: calc(100% - 12px);
+		margin: 0.25rem 0.375rem;
+		background-color: var(--background-modifier-border);
+		color: var(--text-muted);
+		
+		&:hover {
+			background-color: var(--background-modifier-hover);
+			color: var(--text-normal);
+		}
+	}
+
 	#template-list {
 		padding: 0.5rem 0.375rem;
 
+		// 批量操作工具栏样式
+		.batch-operation-toolbar {
+			display: none;
+			flex-direction: row;
+			justify-content: space-between;
+			align-items: center;
+			padding: 0.5rem;
+			margin-bottom: 0.5rem;
+			background-color: var(--background-modifier-border);
+			border-radius: var(--radius-s);
+			font-size: var(--font-ui-smaller);
+
+			.select-all-text {
+				cursor: pointer;
+				color: var(--text-muted);
+				&:hover {
+					color: var(--text-normal);
+				}
+			}
+
+			.batch-operation-buttons {
+				display: flex;
+				gap: 0.25rem;
+
+				button {
+					background: none;
+					border: none;
+					cursor: pointer;
+					padding: 0.25rem;
+					color: var(--text-muted);
+					border-radius: var(--radius-s);
+					display: flex;
+					align-items: center;
+					justify-content: center;
+
+					&:hover {
+						background-color: var(--background-modifier-hover);
+						color: var(--text-normal);
+					}
+
+					&:disabled {
+						opacity: 0.5;
+						cursor: not-allowed;
+					}
+
+					i {
+						width: 16px;
+						height: 16px;
+					}
+				}
+			}
+		}
+
 		li {
+			// 复选框样式
+			.template-checkbox {
+				margin-right: 0.5rem;
+				width: 16px;
+				height: 16px;
+				cursor: pointer;
+			}
+
 			.template-name {
 				flex-grow: 1;
 				margin-right: auto;

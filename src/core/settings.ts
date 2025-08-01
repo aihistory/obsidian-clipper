@@ -9,7 +9,7 @@ import {
 	cleanupTemplateStorage,
 	rebuildTemplateList
 } from '../managers/template-manager';
-import { updateTemplateList, showTemplateEditor, initializeAddPropertyButton } from '../managers/template-ui';
+import { updateTemplateList, showTemplateEditor, initializeAddPropertyButton, initializeBatchModeToggle } from '../managers/template-ui';
 import { initializeGeneralSettings } from '../managers/general-settings';
 import { showSettingsSection, initializeSidebar } from '../managers/settings-section-ui';
 import { initializeReaderSettings } from '../managers/reader-settings';
@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 		initializeSidebar();
 		initializeAutoSave();
 		initializeMenu('more-actions-btn', 'template-actions-menu');
+		initializeBatchModeToggle(); // 初始化批量模式切换
 
 		createIcons({ icons });
 

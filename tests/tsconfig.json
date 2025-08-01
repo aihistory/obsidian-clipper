@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"target": "es6",
+		"module": "commonjs",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"outDir": "./dist",
+		"rootDir": ".",
+		"sourceMap": true,
+		"typeRoots": ["../node_modules/@types"],
+		"moduleResolution": "node",
+		"types": ["node", "jest"],
+		"lib": ["es2017", "dom"],
+		"baseUrl": ".",
+		"paths": {
+			"../src/*": ["../src/*"]
+		}
+	},
+	"include": [
+		"**/*"
+	],
+	"exclude": ["node_modules", "dist"]
+} 

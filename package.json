@@ -13,6 +13,7 @@
 		"build:safari": "webpack --env BROWSER=safari --mode production",
 		"build": "npm run build:chrome && npm run build:firefox && npm run build:safari",
 		"dev": "npm run dev:chrome",
+		"test": "ts-node --project tests/tsconfig.json tests/triggers.test.ts",
 		"update-locales": "ts-node --project scripts/tsconfig.json scripts/update-locales.ts",
 		"check-strings": "ts-node --project scripts/tsconfig.json scripts/check-unused-strings.ts",
 		"add-locale": "ts-node --project scripts/tsconfig.json scripts/add-locale.ts"
@@ -20,6 +21,7 @@
 	"devDependencies": {
 		"@types/chrome": "^0.0.270",
 		"@types/dompurify": "^3.0.5",
+		"@types/jest": "^30.0.0",
 		"@types/node": "^22.5.4",
 		"@types/turndown": "^5.0.5",
 		"@types/webextension-polyfill": "^0.12.1",

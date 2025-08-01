@@ -1,0 +1,110 @@
+# 开发工作流程
+
+## 项目设置
+1. 安装依赖：`npm install`
+2. 选择开发浏览器：
+   - Chrome: `npm run dev:chrome`
+   - Firefox: `npm run dev:firefox`
+   - Safari: `npm run dev:safari`
+
+## 本地安装扩展
+
+### Chrome/Chromium 浏览器
+1. 打开 `chrome://extensions/`
+2. 启用"开发者模式"
+3. 点击"加载已解压的扩展程序"
+4. 选择 `dist/` 目录
+
+### Firefox
+1. 打开 `about:debugging#/runtime/this-firefox`
+2. 点击"临时载入附加组件"
+3. 选择 `dist_firefox/manifest.json`
+
+### Safari
+1. 在 Safari 中启用开发者菜单
+2. 选择"开发" > "显示扩展构建器"
+3. 导入 `dist_safari` 目录
+
+## 开发流程
+
+### 1. 代码修改
+- 修改 TypeScript 文件在 `src/` 目录
+- 修改样式文件在 `src/*.scss`
+- 修改 HTML 模板在 `src/*.html`
+
+### 2. 自动构建
+- 开发模式会自动监听文件变化
+- 修改后会自动重新构建
+- 在浏览器中刷新扩展页面查看更改
+
+### 3. 调试
+- 使用浏览器开发者工具调试
+- Chrome: 右键扩展图标 > "检查弹出内容"
+- Firefox: 右键扩展图标 > "检查元素"
+- 查看控制台日志和错误
+
+### 4. 测试
+- 在不同浏览器中测试功能
+- 测试不同的网页类型
+- 验证模板和变量功能
+
+## 构建生产版本
+```bash
+# 构建所有平台
+npm run build
+
+# 或构建特定平台
+npm run build:chrome
+npm run build:firefox
+npm run build:safari
+```
+
+## 代码质量
+
+### 代码检查
+- 使用 ESLint 检查代码质量
+- 配置在 [.eslintrc.json](mdc:.eslintrc.json)
+- 运行 `npm run lint` (如果配置了)
+
+### 类型检查
+- TypeScript 编译器会进行类型检查
+- 确保所有类型注解正确
+- 修复类型错误
+
+### 格式化
+- 使用 EditorConfig 保持一致的代码格式
+- 配置在 [.editorconfig](mdc:.editorconfig)
+- 使用 Prettier 格式化代码（如果配置了）
+
+## 国际化
+- 翻译文件在 `src/_locales/` 目录
+- 使用 `npm run update-locales` 更新翻译
+- 使用 `npm run check-strings` 检查未使用的字符串
+- 使用 `npm run add-locale` 添加新语言
+
+## 版本管理
+- 更新 [package.json](mdc:package.json) 中的版本号
+- 更新 [README.md](mdc:README.md) 中的变更日志
+- 提交代码到 Git 仓库
+- 创建发布标签
+
+## 故障排除
+
+### 构建问题
+- 检查 Node.js 版本兼容性
+- 清除 `node_modules` 并重新安装
+- 检查 Webpack 配置错误
+
+### 扩展加载问题
+- 检查 manifest.json 语法
+- 验证文件路径正确性
+- 查看浏览器控制台错误
+
+### 功能问题
+- 检查浏览器权限设置
+- 验证 API 调用正确性
+- 查看网络请求和响应
+description:
+globs:
+alwaysApply: false
+---

@@ -425,3 +425,176 @@ async function importAllSettingsFromJson(jsonContent: string): Promise<void> {
 		throw new Error('Error importing settings. Please check the file and try again.');
 	}
 }
+
+// 批量导出模板功能
+export async function exportAllTemplates(): Promise<void> {
+	if (templates.length === 0) {
+		alert(getMessage('noTemplatesToExport'));
+		return;
+	}
+
+	const exportData = {
+		schemaVersion: SCHEMA_VERSION,
+		exportDate: new Date().toISOString(),
+		templateCount: templates.length,
+		templates: templates.map(template => {
+			const isDailyNote = template.behavior === 'append-daily' || template.behavior === 'prepend-daily';
+			
+			const orderedTemplate: Partial<Template> = {
+				name: template.name,
+				behavior: template.behavior,
+				noteContentFormat: template.noteContentFormat,
+				properties: template.properties.map(({ name, value, type }) => ({
+					name,
+					value,
+					type: type || generalSettings.propertyTypes.find(pt => pt.name === name)?.type || 'text'
+				})),
+				triggers: template.triggers,
+			};
+
+			// Only include noteNameFormat and path for non-daily note behaviors
+			if (!isDailyNote) {
+				orderedTemplate.noteNameFormat = template.noteNameFormat;
+				orderedTemplate.path = template.path;
+			}
+
+			// Include context only if it has a value
+			if (template.context) {
+				orderedTemplate.context = template.context;
+			}
+
+			return orderedTemplate;
+		})
+	};
+
+	const content = JSON.stringify(exportData, null, '\t');
+	const fileName = `obsidian-clipper-templates-${new Date().toISOString().split('T')[0]}.json`;
+	
+	await saveFile({
+		content,
+		fileName,
+		mimeType: 'application/json',
+		onError: (error) => console.error('Failed to export templates:', error)
+	});
+}
+
+// 批量导入模板功能
+export async function importAllTemplatesFromJson(jsonContent: string): Promise<void> {
+	try {
+		const importData = JSON.parse(jsonContent);
+		
+		// 检查是否是批量模板文件格式
+		if (importData.templates && Array.isArray(importData.templates)) {
+			// 批量模板文件格式
+			const importedTemplates = importData.templates as Partial<Template>[];
+			let successCount = 0;
+			let errorCount = 0;
+			
+			for (const importedTemplate of importedTemplates) {
+				try {
+					if (validateImportedTemplate(importedTemplate)) {
+						const processedTemplate = await processImportedTemplate(importedTemplate);
+						templates.unshift(processedTemplate);
+						successCount++;
+					} else {
+						console.warn('Invalid template:', importedTemplate.name);
+						errorCount++;
+					}
+				} catch (error) {
+					console.error('Error processing template:', importedTemplate.name, error);
+					errorCount++;
+				}
+			}
+			
+			await saveTemplateSettings();
+			updateTemplateList();
+			
+			if (successCount > 0) {
+				alert(getMessage('batchImportSuccess', [successCount.toString(), errorCount.toString()]));
+			} else {
+				alert(getMessage('batchImportFailed'));
+			}
+		} else {
+			// 单个模板文件格式，保持向后兼容
+			const importedTemplate = importData as Partial<Template>;
+			if (validateImportedTemplate(importedTemplate)) {
+				const processedTemplate = await processImportedTemplate(importedTemplate);
+				templates.unshift(processedTemplate);
+				await saveTemplateSettings();
+				updateTemplateList();
+				showTemplateEditor(processedTemplate);
+				alert(getMessage('templateImportSuccess'));
+			} else {
+				throw new Error('Invalid template file');
+			}
+		}
+	} catch (error) {
+		console.error('Error importing templates:', error);
+		throw new Error('Error importing templates. Please check the file and try again.');
+	}
+}
+
+// 显示批量导入模态框
+export function showBatchTemplateImportModal(): void {
+	showImportModal(
+		'import-modal',
+		importAllTemplatesFromJson,
+		'.json',
+		false,
+		'batchImportTemplates'
+	);
+}
+
+// 导出选中的模板
+export async function exportSelectedTemplates(selectedTemplateIds: string[]): Promise<void> {
+	if (selectedTemplateIds.length === 0) {
+		alert(getMessage('selectTemplatesToExport'));
+		return;
+	}
+
+	const selectedTemplates = templates.filter(template => selectedTemplateIds.includes(template.id));
+	
+	const exportData = {
+		schemaVersion: SCHEMA_VERSION,
+		exportDate: new Date().toISOString(),
+		templateCount: selectedTemplates.length,
+		templates: selectedTemplates.map(template => {
+			const isDailyNote = template.behavior === 'append-daily' || template.behavior === 'prepend-daily';
+			
+			const orderedTemplate: Partial<Template> = {
+				name: template.name,
+				behavior: template.behavior,
+				noteContentFormat: template.noteContentFormat,
+				properties: template.properties.map(({ name, value, type }) => ({
+					name,
+					value,
+					type: type || generalSettings.propertyTypes.find(pt => pt.name === name)?.type || 'text'
+				})),
+				triggers: template.triggers,
+			};
+
+			// Only include noteNameFormat and path for non-daily note behaviors
+			if (!isDailyNote) {
+				orderedTemplate.noteNameFormat = template.noteNameFormat;
+				orderedTemplate.path = template.path;
+			}
+
+			// Include context only if it has a value
+			if (template.context) {
+				orderedTemplate.context = template.context;
+			}
+
+			return orderedTemplate;
+		})
+	};
+
+	const content = JSON.stringify(exportData, null, '\t');
+	const fileName = `obsidian-clipper-selected-templates-${new Date().toISOString().split('T')[0]}.json`;
+	
+	await saveFile({
+		content,
+		fileName,
+		mimeType: 'application/json',
+		onError: (error) => console.error('Failed to export selected templates:', error)
+	});
+}

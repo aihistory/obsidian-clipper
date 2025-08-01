@@ -799,5 +799,56 @@
 	},
 	"version": {
 		"message": "版本"
+	},
+	"batchExportTemplates": {
+		"message": "批量导出模板"
+	},
+	"batchImportTemplates": {
+		"message": "批量导入模板"
+	},
+	"batchExportTemplatesDescription": {
+		"message": "导出所有模板到单个文件"
+	},
+	"batchImportTemplatesDescription": {
+		"message": "从文件导入多个模板"
+	},
+	"noTemplatesToExport": {
+		"message": "没有可导出的模板"
+	},
+	"selectTemplatesToExport": {
+		"message": "请选择要导出的模板"
+	},
+	"batchImportSuccess": {
+		"message": "成功导入 $1 个模板，$2 个失败"
+	},
+	"batchImportFailed": {
+		"message": "批量导入失败，请检查文件格式"
+	},
+	"templateImportSuccess": {
+		"message": "模板导入成功"
+	},
+	"selectAll": {
+		"message": "全选"
+	},
+	"deselectAll": {
+		"message": "取消全选"
+	},
+	"exportSelected": {
+		"message": "导出选中"
+	},
+	"deleteSelected": {
+		"message": "删除选中"
+	},
+	"confirmDeleteSelectedTemplates": {
+		"message": "确定要删除选中的 $1 个模板吗？"
+	},
+	"templatesSelected": {
+		"message": "已选择 $1 个模板"
+	},
+	"batchManage": {
+		"message": "批量管理"
+	},
+	"exitBatchMode": {
+		"message": "退出批量模式"
 	}
 }

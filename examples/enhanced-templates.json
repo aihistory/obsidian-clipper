@@ -1,0 +1,230 @@
+{
+	"templates": [
+		{
+			"id": "tech-blog-template",
+			"name": "技术博客模板",
+			"behavior": "create",
+			"noteNameFormat": "{{title}}",
+			"path": "技术博客",
+			"noteContentFormat": "---\ntitle: {{title}}\nauthor: {{author}}\ndate: {{date}}\ntags: [技术, 博客]\nurl: {{url}}\n---\n\n{{content}}\n\n## 参考链接\n- 原文: {{url}}\n- 作者: {{author}}\n- 发布时间: {{date}}",
+			"properties": [
+				{
+					"name": "author",
+					"value": "{{author}}"
+				},
+				{
+					"name": "tags",
+					"value": "技术, 博客"
+				}
+			],
+			"triggers": [
+				"url:https://tech.example.com AND title:contains(\"技术\")",
+				"(url:https://dev.example.com OR url:https://*.tech.com) AND schema:@Article",
+				"url:https://*.github.com/* AND title:contains(\"教程\")"
+			],
+			"context": "这是一个技术博客文章，包含代码示例和技术讨论。"
+		},
+		{
+			"id": "news-article-template",
+			"name": "新闻文章模板",
+			"behavior": "create",
+			"noteNameFormat": "{{title}}",
+			"path": "新闻",
+			"noteContentFormat": "---\ntitle: {{title}}\nsource: {{source}}\ndate: {{date}}\ntags: [新闻]\nurl: {{url}}\n---\n\n{{content}}\n\n## 新闻来源\n- 来源: {{source}}\n- 链接: {{url}}\n- 发布时间: {{date}}",
+			"properties": [
+				{
+					"name": "source",
+					"value": "{{source}}"
+				},
+				{
+					"name": "tags",
+					"value": "新闻"
+				}
+			],
+			"triggers": [
+				"url:https://news.example.com AND title:contains(\"新闻\")",
+				"time:between(06:00,22:00) AND schema:@NewsArticle",
+				"(url:https://*.news.com OR url:https://*.media.com) AND title:contains(\"报道\")"
+			],
+			"context": "这是一篇新闻文章，包含最新的新闻报道和事件信息。"
+		},
+		{
+			"id": "product-page-template",
+			"name": "产品页面模板",
+			"behavior": "create",
+			"noteNameFormat": "{{title}}",
+			"path": "产品",
+			"noteContentFormat": "---\ntitle: {{title}}\nprice: {{price}}\nbrand: {{brand}}\ntags: [产品]\nurl: {{url}}\n---\n\n{{content}}\n\n## 产品信息\n- 品牌: {{brand}}\n- 价格: {{price}}\n- 链接: {{url}}\n- 评分: {{rating}}",
+			"properties": [
+				{
+					"name": "price",
+					"value": "{{price}}"
+				},
+				{
+					"name": "brand",
+					"value": "{{brand}}"
+				},
+				{
+					"name": "tags",
+					"value": "产品"
+				}
+			],
+			"triggers": [
+				"schema:@Product AND selector:.product-price",
+				"meta:og:type=product",
+				"url:https://*.amazon.com/* AND selector:.price"
+			],
+			"context": "这是一个产品页面，包含产品信息、价格和购买链接。"
+		},
+		{
+			"id": "recipe-template",
+			"name": "食谱模板",
+			"behavior": "create",
+			"noteNameFormat": "{{title}}",
+			"path": "食谱",
+			"noteContentFormat": "---\ntitle: {{title}}\ncookTime: {{cookTime}}\nservings: {{servings}}\ntags: [食谱, 美食]\nurl: {{url}}\n---\n\n## 食材\n{{ingredients}}\n\n## 步骤\n{{instructions}}\n\n## 烹饪信息\n- 烹饪时间: {{cookTime}}\n- 份量: {{servings}}\n- 难度: {{difficulty}}\n- 来源: {{url}}",
+			"properties": [
+				{
+					"name": "cookTime",
+					"value": "{{cookTime}}"
+				},
+				{
+					"name": "servings",
+					"value": "{{servings}}"
+				},
+				{
+					"name": "tags",
+					"value": "食谱, 美食"
+				}
+			],
+			"triggers": [
+				"schema:@Recipe AND title:contains(\"食谱\")",
+				"selector:.ingredients AND selector:.instructions",
+				"url:https://*.cook.com/* AND schema:@Recipe"
+			],
+			"context": "这是一个食谱页面，包含食材清单、烹饪步骤和营养信息。"
+		},
+		{
+			"id": "workday-tech-template",
+			"name": "工作日技术文章模板",
+			"behavior": "create",
+			"noteNameFormat": "{{title}}",
+			"path": "工作日技术",
+			"noteContentFormat": "---\ntitle: {{title}}\nauthor: {{author}}\ndate: {{date}}\ntags: [技术, 工作日]\nurl: {{url}}\n---\n\n{{content}}\n\n## 工作日学习笔记\n- 阅读时间: {{date}}\n- 作者: {{author}}\n- 链接: {{url}}\n- 重点: {{highlights}}",
+			"properties": [
+				{
+					"name": "author",
+					"value": "{{author}}"
+				},
+				{
+					"name": "tags",
+					"value": "技术, 工作日"
+				}
+			],
+			"triggers": [
+				"url:https://tech.example.com AND title:contains(\"技术\") AND time:weekday(monday) AND time:between(09:00,17:00)",
+				"url:https://tech.example.com AND title:contains(\"技术\") AND time:weekday(tuesday) AND time:between(09:00,17:00)",
+				"url:https://tech.example.com AND title:contains(\"技术\") AND time:weekday(wednesday) AND time:between(09:00,17:00)",
+				"url:https://tech.example.com AND title:contains(\"技术\") AND time:weekday(thursday) AND time:between(09:00,17:00)",
+				"url:https://tech.example.com AND title:contains(\"技术\") AND time:weekday(friday) AND time:between(09:00,17:00)"
+			],
+			"context": "这是工作日期间阅读的技术文章，用于学习和知识积累。"
+		},
+		{
+			"id": "weekend-reading-template",
+			"name": "周末阅读模板",
+			"behavior": "create",
+			"noteNameFormat": "{{title}}",
+			"path": "周末阅读",
+			"noteContentFormat": "---\ntitle: {{title}}\nauthor: {{author}}\ndate: {{date}}\ntags: [阅读, 周末]\nurl: {{url}}\n---\n\n{{content}}\n\n## 周末阅读笔记\n- 阅读时间: {{date}}\n- 作者: {{author}}\n- 链接: {{url}}\n- 感想: {{thoughts}}",
+			"properties": [
+				{
+					"name": "author",
+					"value": "{{author}}"
+				},
+				{
+					"name": "tags",
+					"value": "阅读, 周末"
+				}
+			],
+			"triggers": [
+				"time:weekday(saturday) AND (url:https://*.blog.com/* OR url:https://*.medium.com/*)",
+				"time:weekday(sunday) AND (url:https://*.blog.com/* OR url:https://*.medium.com/*)",
+				"time:weekday(saturday) AND title:contains(\"深度\")",
+				"time:weekday(sunday) AND title:contains(\"思考\")"
+			],
+			"context": "这是周末期间阅读的文章，用于深度思考和知识拓展。"
+		},
+		{
+			"id": "priority-article-template",
+			"name": "重要文章模板",
+			"behavior": "create",
+			"noteNameFormat": "【重要】{{title}}",
+			"path": "重要文章",
+			"noteContentFormat": "---\ntitle: {{title}}\nauthor: {{author}}\ndate: {{date}}\ntags: [重要, 文章]\nurl: {{url}}\npriority: high\n---\n\n{{content}}\n\n## 重要文章笔记\n- 重要性: 高\n- 作者: {{author}}\n- 链接: {{url}}\n- 关键点: {{keyPoints}}\n- 行动项: {{actionItems}}",
+			"properties": [
+				{
+					"name": "author",
+					"value": "{{author}}"
+				},
+				{
+					"name": "tags",
+					"value": "重要, 文章"
+				},
+				{
+					"name": "priority",
+					"value": "high"
+				}
+			],
+			"triggers": [
+				"priority:10 title:contains(\"重要\")",
+				"priority:10 title:contains(\"紧急\")",
+				"priority:10 title:contains(\"关键\")",
+				"priority:10 url:https://important.example.com/*"
+			],
+			"context": "这是重要文章，需要重点关注和深入分析。"
+		},
+		{
+			"id": "social-media-template",
+			"name": "社交媒体模板",
+			"behavior": "create",
+			"noteNameFormat": "{{title}}",
+			"path": "社交媒体",
+			"noteContentFormat": "---\ntitle: {{title}}\nauthor: {{author}}\ndate: {{date}}\ntags: [社交媒体]\nurl: {{url}}\nplatform: {{platform}}\n---\n\n{{content}}\n\n## 社交媒体内容\n- 平台: {{platform}}\n- 作者: {{author}}\n- 链接: {{url}}\n- 发布时间: {{date}}\n- 互动数据: {{engagement}}",
+			"properties": [
+				{
+					"name": "author",
+					"value": "{{author}}"
+				},
+				{
+					"name": "platform",
+					"value": "{{platform}}"
+				},
+				{
+					"name": "tags",
+					"value": "社交媒体"
+				}
+			],
+			"triggers": [
+				"url:https://*.twitter.com/* AND selector:.tweet-text",
+				"url:https://*.linkedin.com/* AND selector:.post-content",
+				"url:https://*.facebook.com/* AND selector:.post-text",
+				"meta:og:type=article AND (url:https://*.social.com/* OR url:https://*.platform.com/*)"
+			],
+			"context": "这是社交媒体内容，包含用户生成的内容和互动信息。"
+		}
+	],
+	"metadata": {
+		"version": "2.0.0",
+		"description": "Enhanced template examples showcasing advanced trigger functionality",
+		"features": [
+			"Combined conditions with AND/OR operators",
+			"Multiple match types (URL, title, DOM, meta, time)",
+			"Wildcard support in URL patterns",
+			"Time-based triggering",
+			"Priority-based matching",
+			"Schema.org integration"
+		],
+		"usage": "Import these templates to test the enhanced trigger system functionality"
+	}
+} 

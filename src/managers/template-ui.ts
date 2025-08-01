@@ -10,7 +10,11 @@ import { updatePromptContextVisibility } from './interpreter-settings';
 import { showSettingsSection } from './settings-section-ui';
 import { updatePropertyType } from './property-types-manager';
 import { getMessage } from '../utils/i18n';
+import { exportAllTemplates, showBatchTemplateImportModal, exportSelectedTemplates } from '../utils/import-export';
+
 let hasUnsavedChanges = false;
+let selectedTemplateIds: Set<string> = new Set();
+let isBatchMode = false;
 
 export function resetUnsavedChanges(): void {
 	hasUnsavedChanges = false;
@@ -30,9 +34,28 @@ export function updateTemplateList(loadedTemplates?: Template[]): void {
 		template != null && typeof template === 'object' && 'id' in template && 'name' in template
 	);
 
+	// 添加批量操作工具栏
+	addBatchOperationToolbar(templateList);
+
 	templateList.innerHTML = '';
 	validTemplates.forEach((template, index) => {
 		const li = document.createElement('li');
+		
+		// 添加复选框（仅在批量模式下显示）
+		const checkbox = createElementWithClass('input', 'template-checkbox') as HTMLInputElement;
+		checkbox.type = 'checkbox';
+		checkbox.style.display = isBatchMode ? 'block' : 'none';
+		checkbox.checked = selectedTemplateIds.has(template.id);
+		checkbox.addEventListener('change', (e) => {
+			const target = e.target as HTMLInputElement;
+			if (target.checked) {
+				selectedTemplateIds.add(template.id);
+			} else {
+				selectedTemplateIds.delete(template.id);
+			}
+			updateBatchOperationStatus();
+		});
+		li.appendChild(checkbox);
 		
 		const dragHandle = createElementWithClass('div', 'drag-handle');
 		dragHandle.appendChild(createElementWithHTML('i', '', { 'data-lucide': 'grip-vertical' }));
@@ -50,7 +73,7 @@ export function updateTemplateList(loadedTemplates?: Template[]): void {
 
 		li.dataset.id = template.id;
 		li.dataset.index = index.toString();
-		li.draggable = true;
+		li.draggable = !isBatchMode; // 批量模式下禁用拖拽
 
 		let touchStartTime: number;
 		let touchStartY: number;
@@ -67,17 +90,31 @@ export function updateTemplateList(loadedTemplates?: Template[]): void {
 
 			if (touchDuration < 300 && touchDistance < 10) {
 				const target = e.target as HTMLElement;
-				if (!target.closest('.delete-template-btn')) {
+				if (!target.closest('.delete-template-btn') && !target.closest('.template-checkbox')) {
 					e.preventDefault();
-					showTemplateEditor(template);
-					// Add these lines to close the sidebar and deactivate the hamburger menu
-					const settingsContainer = document.getElementById('settings');
-					const hamburgerMenu = document.getElementById('hamburger-menu');
-					if (settingsContainer) {
-						settingsContainer.classList.remove('sidebar-open');
-					}
-					if (hamburgerMenu) {
-						hamburgerMenu.classList.remove('is-active');
+					if (!isBatchMode) {
+						showTemplateEditor(template);
+						// Add these lines to close the sidebar and deactivate the hamburger menu
+						const settingsContainer = document.getElementById('settings');
+						const hamburgerMenu = document.getElementById('hamburger-menu');
+						if (settingsContainer) {
+							settingsContainer.classList.remove('sidebar-open');
+						}
+						if (hamburgerMenu) {
+							hamburgerMenu.classList.remove('is-active');
+						}
+					} else {
+						// 批量模式下点击切换选择状态
+						const checkbox = li.querySelector('.template-checkbox') as HTMLInputElement;
+						if (checkbox) {
+							checkbox.checked = !checkbox.checked;
+							if (checkbox.checked) {
+								selectedTemplateIds.add(template.id);
+							} else {
+								selectedTemplateIds.delete(template.id);
+							}
+							updateBatchOperationStatus();
+						}
 					}
 				}
 			}
@@ -86,14 +123,34 @@ export function updateTemplateList(loadedTemplates?: Template[]): void {
 		// Keep the click event for non-touch devices
 		li.addEventListener('click', (e) => {
 			const target = e.target as HTMLElement;
-			if (!target.closest('.delete-template-btn')) {
-				showTemplateEditor(template);
+			if (!target.closest('.delete-template-btn') && !target.closest('.template-checkbox')) {
+				if (!isBatchMode) {
+					showTemplateEditor(template);
+				} else {
+					// 批量模式下点击切换选择状态
+					const checkbox = li.querySelector('.template-checkbox') as HTMLInputElement;
+					if (checkbox) {
+						checkbox.checked = !checkbox.checked;
+						if (checkbox.checked) {
+							selectedTemplateIds.add(template.id);
+						} else {
+							selectedTemplateIds.delete(template.id);
+						}
+						updateBatchOperationStatus();
+					}
+				}
 			}
 		});
 
 		deleteBtn.addEventListener('click', (e) => {
 			e.stopPropagation();
-			deleteTemplateFromList(template.id);
+			if (isBatchMode) {
+				// 批量模式下删除选中的模板
+				selectedTemplateIds.add(template.id);
+				deleteSelectedTemplates();
+			} else {
+				deleteTemplateFromList(template.id);
+			}
 		});
 		
 		if (index === editingTemplateIndex) {
@@ -108,6 +165,7 @@ export function updateTemplateList(loadedTemplates?: Template[]): void {
 	}
 
 	initializeIcons(templateList);
+	updateBatchOperationStatus();
 }
 
 // Rename this function to make it clear it's for deleting from the list
@@ -148,7 +206,7 @@ export function showTemplateEditor(template: Template | null): void {
 			noteContentFormat: '{{content}}',
 			properties: [],
 			triggers: [],
-			context: ''
+			context: '',
 		};
 		templates.unshift(editingTemplate);
 		setEditingTemplateIndex(0);
@@ -605,4 +663,149 @@ function updatePropertyNameSuggestions(): void {
 
 export function refreshPropertyNameSuggestions(): void {
 	updatePropertyNameSuggestions();
+}
+
+function addBatchOperationToolbar(templateList: HTMLElement): void {
+	const batchOperationToolbar = createElementWithClass('div', 'batch-operation-toolbar');
+
+	const selectAllCheckbox = createElementWithClass('input', 'select-all-checkbox') as HTMLInputElement;
+	selectAllCheckbox.type = 'checkbox';
+	selectAllCheckbox.style.display = 'none'; // Initially hidden
+	selectAllCheckbox.addEventListener('change', (e) => {
+		const target = e.target as HTMLInputElement;
+		if (target.checked) {
+			selectedTemplateIds.clear();
+			templateList.querySelectorAll('.template-checkbox').forEach((checkbox) => {
+				const input = checkbox as HTMLInputElement;
+				input.checked = true;
+				selectedTemplateIds.add(checkbox.parentElement?.dataset.id || '');
+			});
+		} else {
+			selectedTemplateIds.clear();
+			templateList.querySelectorAll('.template-checkbox').forEach((checkbox) => {
+				const input = checkbox as HTMLInputElement;
+				input.checked = false;
+			});
+		}
+		updateBatchOperationStatus();
+	});
+	batchOperationToolbar.appendChild(selectAllCheckbox);
+
+	const selectAllSpan = createElementWithClass('span', 'select-all-text');
+	selectAllSpan.textContent = getMessage('selectAll');
+	batchOperationToolbar.appendChild(selectAllSpan);
+
+	const batchOperationButtons = createElementWithClass('div', 'batch-operation-buttons');
+
+	const exportBtn = createElementWithClass('button', 'batch-export-btn clickable-icon');
+	exportBtn.setAttribute('type', 'button');
+	exportBtn.setAttribute('aria-label', getMessage('exportSelected'));
+	exportBtn.appendChild(createElementWithHTML('i', '', { 'data-lucide': 'download' }));
+	exportBtn.addEventListener('click', () => {
+		exportSelectedTemplates(Array.from(selectedTemplateIds));
+	});
+	batchOperationButtons.appendChild(exportBtn);
+
+	const importBtn = createElementWithClass('button', 'batch-import-btn clickable-icon');
+	importBtn.setAttribute('type', 'button');
+	importBtn.setAttribute('aria-label', getMessage('import'));
+	importBtn.appendChild(createElementWithHTML('i', '', { 'data-lucide': 'upload' }));
+	importBtn.addEventListener('click', () => {
+		showBatchTemplateImportModal();
+	});
+	batchOperationButtons.appendChild(importBtn);
+
+	const deleteSelectedBtn = createElementWithClass('button', 'batch-delete-btn clickable-icon');
+	deleteSelectedBtn.setAttribute('type', 'button');
+	deleteSelectedBtn.setAttribute('aria-label', getMessage('deleteSelected'));
+	deleteSelectedBtn.appendChild(createElementWithHTML('i', '', { 'data-lucide': 'trash-2' }));
+	deleteSelectedBtn.addEventListener('click', () => {
+		deleteSelectedTemplates();
+	});
+	batchOperationButtons.appendChild(deleteSelectedBtn);
+
+	batchOperationToolbar.appendChild(batchOperationButtons);
+	templateList.appendChild(batchOperationToolbar);
+
+	// 添加全选/取消全选的点击事件
+	selectAllSpan.addEventListener('click', () => {
+		const allChecked = selectedTemplateIds.size === templates.length;
+		templateList.querySelectorAll('.template-checkbox').forEach((checkbox) => {
+			const input = checkbox as HTMLInputElement;
+			input.checked = !allChecked;
+			const id = checkbox.parentElement?.dataset.id || '';
+			if (!allChecked) {
+				selectedTemplateIds.add(id);
+			} else {
+				selectedTemplateIds.delete(id);
+			}
+		});
+		updateBatchOperationStatus();
+	});
+}
+
+function updateBatchOperationStatus(): void {
+	const selectAllCheckbox = document.querySelector('.select-all-checkbox') as HTMLInputElement;
+	const selectedCountSpan = document.getElementById('selected-count');
+	const deleteSelectedBtn = document.querySelector('.batch-delete-btn') as HTMLButtonElement;
+
+	if (selectAllCheckbox) {
+		selectAllCheckbox.checked = selectedTemplateIds.size === templates.length;
+	}
+
+	if (selectedCountSpan) {
+		selectedCountSpan.textContent = `${selectedTemplateIds.size} / ${templates.length}`;
+	}
+
+	if (deleteSelectedBtn) {
+		deleteSelectedBtn.disabled = selectedTemplateIds.size === 0;
+	}
+}
+
+async function deleteSelectedTemplates(): Promise<void> {
+	if (selectedTemplateIds.size === 0) {
+		return;
+	}
+
+	const templateNames = Array.from(selectedTemplateIds).map(id => {
+		const template = templates.find(t => t.id === id);
+		return template ? template.name : 'Unknown Template';
+	});
+
+	if (confirm(getMessage('confirmDeleteSelectedTemplates', [selectedTemplateIds.size.toString()]))) {
+		for (const templateId of selectedTemplateIds) {
+			await deleteTemplate(templateId);
+		}
+		selectedTemplateIds.clear();
+		updateTemplateList();
+	}
+}
+
+// 添加批量模式切换功能
+export function initializeBatchModeToggle(): void {
+	const batchModeToggleBtn = document.getElementById('batch-mode-toggle-btn');
+	if (batchModeToggleBtn) {
+		batchModeToggleBtn.addEventListener('click', () => {
+			isBatchMode = !isBatchMode;
+			selectedTemplateIds.clear();
+			
+			// 更新按钮文本
+			batchModeToggleBtn.textContent = isBatchMode ? getMessage('exitBatchMode') : getMessage('batchManage');
+			
+			// 更新模板列表
+			updateTemplateList();
+			
+			// 显示/隐藏批量操作工具栏
+			const batchToolbar = document.querySelector('.batch-operation-toolbar') as HTMLElement;
+			if (batchToolbar) {
+				batchToolbar.style.display = isBatchMode ? 'flex' : 'none';
+			}
+			
+			// 显示/隐藏复选框
+			document.querySelectorAll('.template-checkbox').forEach((checkbox) => {
+				const element = checkbox as HTMLElement;
+				element.style.display = isBatchMode ? 'block' : 'none';
+			});
+		});
+	}
 }

@@ -1,0 +1,42 @@
+# Obsidian Clipper 项目概览
+
+这是一个官方的 Obsidian Web Clipper 浏览器扩展项目，用于从网页中提取内容并保存为 Markdown 格式。
+
+## 项目架构
+
+### 核心文件
+- [package.json](mdc:package.json) - 项目配置和依赖管理
+- [webpack.config.js](mdc:webpack.config.js) - 构建配置，支持 Chrome、Firefox、Safari
+- [tsconfig.json](mdc:tsconfig.json) - TypeScript 配置
+
+### 主要入口点
+- [src/background.ts](mdc:src/background.ts) - 扩展后台脚本
+- [src/content.ts](mdc:src/content.ts) - 内容脚本
+- [src/core/popup.ts](mdc:src/core/popup.ts) - 弹出窗口逻辑
+- [src/core/settings.ts](mdc:src/core/settings.ts) - 设置页面逻辑
+
+### 浏览器兼容性
+项目支持三个主要浏览器平台：
+- Chrome/Chromium 浏览器 (Chrome, Brave, Arc, Edge)
+- Firefox
+- Safari (macOS, iOS, iPadOS)
+
+### 构建输出
+- `dist/` - Chrome 版本
+- `dist_firefox/` - Firefox 版本  
+- `dist_safari/` - Safari 版本
+
+## 技术栈
+- **语言**: TypeScript
+- **构建工具**: Webpack 5
+- **样式**: SCSS
+- **主要库**: 
+  - webextension-polyfill (浏览器兼容性)
+  - turndown (HTML 转 Markdown)
+  - dompurify (HTML 清理)
+  - dayjs (日期处理)
+  - lucide (图标)
+description:
+globs:
+alwaysApply: false
+---

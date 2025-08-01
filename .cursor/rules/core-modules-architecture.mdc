@@ -1,0 +1,112 @@
+# 核心模块架构
+
+## 模块组织结构
+
+### 核心模块 (`src/core/`)
+- [src/core/popup.ts](mdc:src/core/popup.ts) - 弹出窗口主逻辑 (43KB, 1225行)
+- [src/core/settings.ts](mdc:src/core/settings.ts) - 设置页面逻辑 (6.2KB, 178行)
+
+### 管理器模块 (`src/managers/`)
+- [src/managers/template-manager.ts](mdc:src/managers/template-manager.ts) - 模板管理 (9.2KB, 272行)
+- [src/managers/template-ui.ts](mdc:src/managers/template-ui.ts) - 模板UI组件 (22KB, 608行)
+- [src/managers/interpreter-settings.ts](mdc:src/managers/interpreter-settings.ts) - 解释器设置 (32KB, 951行)
+- [src/managers/general-settings.ts](mdc:src/managers/general-settings.ts) - 通用设置 (17KB, 472行)
+- [src/managers/property-types-manager.ts](mdc:src/managers/property-types-manager.ts) - 属性类型管理 (13KB, 369行)
+- [src/managers/settings-section-ui.ts](mdc:src/managers/settings-section-ui.ts) - 设置UI组件 (3.7KB, 114行)
+- [src/managers/highlights-manager.ts](mdc:src/managers/highlights-manager.ts) - 高亮管理 (1.8KB, 58行)
+- [src/managers/inspect-variables.ts](mdc:src/managers/inspect-variables.ts) - 变量检查 (5.7KB, 174行)
+- [src/managers/menu.ts](mdc:src/managers/menu.ts) - 菜单管理 (1.8KB, 60行)
+
+### 工具模块 (`src/utils/`)
+- [src/utils/interpreter.ts](mdc:src/utils/interpreter.ts) - 模板解释器 (23KB, 672行)
+- [src/utils/markdown-converter.ts](mdc:src/utils/markdown-converter.ts) - Markdown转换 (21KB, 675行)
+- [src/utils/reader.ts](mdc:src/utils/reader.ts) - 阅读器功能 (37KB, 1083行)
+- [src/utils/highlighter.ts](mdc:src/utils/highlighter.ts) - 高亮功能 (31KB, 909行)
+- [src/utils/highlighter-overlays.ts](mdc:src/utils/highlighter-overlays.ts) - 高亮覆盖层 (19KB, 541行)
+- [src/utils/storage-utils.ts](mdc:src/utils/storage-utils.ts) - 存储工具 (9.0KB, 286行)
+- [src/utils/i18n.ts](mdc:src/utils/i18n.ts) - 国际化 (8.6KB, 280行)
+- [src/utils/import-export.ts](mdc:src/utils/import-export.ts) - 导入导出 (14KB, 427行)
+- [src/utils/content-extractor.ts](mdc:src/utils/content-extractor.ts) - 内容提取 (12KB, 401行)
+- [src/utils/i18n-automation.ts](mdc:src/utils/i18n-automation.ts) - 国际化自动化 (11KB, 313行)
+
+## 模块依赖关系
+
+### 核心依赖
+```
+popup.ts → template-manager.ts → interpreter.ts
+popup.ts → storage-utils.ts → browser.storage
+popup.ts → i18n.ts → _locales/
+```
+
+### 工具依赖
+```
+markdown-converter.ts → turndown + dompurify
+reader.ts → content-extractor.ts
+highlighter.ts → highlighter-overlays.ts
+```
+
+### 设置依赖
+```
+settings.ts → general-settings.ts
+settings.ts → template-ui.ts → template-manager.ts
+settings.ts → interpreter-settings.ts → interpreter.ts
+```
+
+## 设计模式
+
+### 管理器模式
+- 每个功能域都有对应的管理器类
+- 管理器负责该域的业务逻辑和状态管理
+- 提供统一的接口供其他模块调用
+
+### 工具类模式
+- 工具类提供纯函数或静态方法
+- 不维护状态，专注于特定功能
+- 可被多个模块复用
+
+### 依赖注入
+- 通过构造函数注入依赖
+- 便于测试和模块解耦
+- 使用接口定义依赖契约
+
+## 数据流
+
+### 用户操作流程
+1. 用户点击扩展图标 → `popup.ts`
+2. 弹出窗口显示 → 调用相关管理器
+3. 用户选择操作 → 调用对应工具类
+4. 处理结果 → 更新UI或存储
+
+### 设置管理流程
+1. 用户打开设置 → `settings.ts`
+2. 加载当前设置 → `storage-utils.ts`
+3. 用户修改设置 → 相关管理器处理
+4. 保存设置 → `storage-utils.ts`
+
+### 内容处理流程
+1. 用户选择内容 → `content.ts`
+2. 提取网页内容 → `content-extractor.ts`
+3. 应用模板 → `interpreter.ts`
+4. 转换为Markdown → `markdown-converter.ts`
+5. 保存到Obsidian → `obsidian-note-creator.ts`
+
+## 扩展点
+
+### 新功能添加
+- 在 `managers/` 中添加新的管理器
+- 在 `utils/` 中添加新的工具类
+- 在 `core/` 中集成到主流程
+
+### 模板系统扩展
+- 扩展 `interpreter.ts` 支持新的模板语法
+- 在 `template-manager.ts` 中添加新的模板类型
+- 更新 `template-ui.ts` 提供UI支持
+
+### 国际化扩展
+- 在 `_locales/` 中添加新的语言文件
+- 使用 `i18n-automation.ts` 自动化翻译流程
+- 更新 `i18n.ts` 支持新的语言
+description:
+globs:
+alwaysApply: false
+---

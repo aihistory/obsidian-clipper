@@ -1,0 +1,65 @@
+# TypeScript 编码标准
+
+## 代码风格
+- 使用 **严格模式** (`strict: true`)
+- 强制使用分号
+- 使用单引号
+- 使用 2 空格缩进
+- 使用 `const` 和 `let`，避免 `var`
+
+## 类型注解
+- 为所有函数参数和返回值添加类型注解
+- 使用接口定义对象结构
+- 优先使用 `interface` 而非 `type` 用于对象类型
+- 使用泛型提高代码复用性
+
+## 模块导入
+- 使用 ES6 模块语法 (`import`/`export`)
+- 按以下顺序组织导入：
+  1. 第三方库
+  2. 项目内部模块
+  3. 相对路径导入
+- 使用绝对路径导入项目内部模块（基于 `tsconfig.json` 的路径映射）
+
+## 错误处理
+- 使用 `try-catch` 处理异步操作
+- 为 Promise 添加错误处理
+- 使用类型守卫进行类型检查
+
+## 浏览器扩展特定
+- 使用 `webextension-polyfill` 确保跨浏览器兼容性
+- 遵循浏览器扩展的安全最佳实践
+- 使用 `chrome.*` API 时添加适当的类型注解
+
+## 示例
+```typescript
+import { browser } from 'webextension-polyfill';
+import { TemplateManager } from 'managers/template-manager';
+import { StorageUtils } from 'utils/storage-utils';
+
+interface ClipperSettings {
+  autoSave: boolean;
+  template: string;
+}
+
+export class SettingsManager {
+  private settings: ClipperSettings;
+
+  constructor() {
+    this.settings = this.getDefaultSettings();
+  }
+
+  public async loadSettings(): Promise<ClipperSettings> {
+    try {
+      const stored = await StorageUtils.get('settings');
+      return { ...this.settings, ...stored };
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      return this.settings;
+    }
+  }
+}
+description:
+globs:
+alwaysApply: false
+---

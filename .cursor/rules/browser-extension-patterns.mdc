@@ -1,0 +1,98 @@
+# 浏览器扩展开发模式
+
+## 架构模式
+Obsidian Clipper 使用标准的浏览器扩展架构：
+
+### 核心组件
+- **Background Script** ([src/background.ts](mdc:src/background.ts)) - 扩展的生命周期管理
+- **Content Script** ([src/content.ts](mdc:src/content.ts)) - 注入到网页中
+- **Popup** ([src/core/popup.ts](mdc:src/core/popup.ts)) - 用户界面
+- **Settings** ([src/core/settings.ts](mdc:src/core/settings.ts)) - 配置管理
+
+## 跨浏览器兼容性
+- 使用 `webextension-polyfill` 统一 API
+- 导入方式：`import { browser } from 'webextension-polyfill'`
+- 避免直接使用 `chrome.*` API
+
+## 存储模式
+- 使用 `browser.storage.local` 存储用户设置
+- 使用 `browser.storage.sync` 跨设备同步（如果支持）
+- 参考 [src/utils/storage-utils.ts](mdc:src/utils/storage-utils.ts) 的实现
+
+## 消息传递
+- 使用 `browser.runtime.sendMessage` 进行组件间通信
+- 定义明确的消息类型和接口
+- 处理异步消息响应
+
+## 权限管理
+- 最小权限原则
+- 在 [manifest.json](mdc:src/manifest.chrome.json) 中声明必要权限
+- 动态请求权限（如果可能）
+
+## 安全最佳实践
+- 使用 `DOMPurify` 清理用户输入
+- 避免使用 `eval()` 和 `innerHTML`
+- 验证所有外部数据
+- 使用 CSP (Content Security Policy)
+
+## 性能优化
+- 延迟加载非关键功能
+- 使用 `requestIdleCallback` 处理低优先级任务
+- 避免在 content script 中执行重计算
+- 使用 `chrome.tabs.query` 优化标签页查询
+
+## 错误处理
+- 捕获并记录所有异步操作的错误
+- 提供用户友好的错误消息
+- 实现优雅的降级机制
+
+## 示例模式
+```typescript
+// 消息传递模式
+interface MessageRequest {
+  type: 'CLIP_CONTENT' | 'GET_SETTINGS' | 'SAVE_NOTE';
+  data?: any;
+}
+
+interface MessageResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+// 存储模式
+class StorageManager {
+  static async get<T>(key: string): Promise<T | null> {
+    try {
+      const result = await browser.storage.local.get(key);
+      return result[key] || null;
+    } catch (error) {
+      console.error('Storage get error:', error);
+      return null;
+    }
+  }
+  
+  static async set(key: string, value: any): Promise<void> {
+    try {
+      await browser.storage.local.set({ [key]: value });
+    } catch (error) {
+      console.error('Storage set error:', error);
+    }
+  }
+}
+
+// 权限检查模式
+async function checkPermission(permission: string): Promise<boolean> {
+  try {
+    const result = await browser.permissions.contains({ permissions: [permission] });
+    return result;
+  } catch (error) {
+    console.error('Permission check failed:', error);
+    return false;
+  }
+}
+```
+description:
+globs:
+alwaysApply: false
+---
