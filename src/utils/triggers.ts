@@ -3,6 +3,27 @@ import { memoize, memoizeWithExpiration } from './memoize';
 
 // ==================== 类型定义 ====================
 
+// Debug configuration for production environment
+const DEBUG_TRIGGERS = true; // Temporarily enable for debugging template matching issue
+
+// Debug logging function
+function debugLog(...args: any[]): void {
+	if (DEBUG_TRIGGERS) {
+		console.log(...args);
+	}
+}
+
+function debugWarn(...args: any[]): void {
+	if (DEBUG_TRIGGERS) {
+		console.warn(...args);
+	}
+}
+
+function debugError(...args: any[]): void {
+	// Always log errors, but can be controlled if needed
+	console.error(...args);
+}
+
 interface TriggerMatch {
 	template: Template;
 	priority: number;
@@ -54,7 +75,7 @@ class Lexer {
 		this.tokens = [];
 		this.position = 0;
 
-		console.log(`Tokenizing input: ${this.input}`);
+		debugLog(`Tokenizing input: ${this.input}`);
 
 		while (this.position < this.input.length) {
 			const char = this.input[this.position];
@@ -97,7 +118,7 @@ class Lexer {
 		}
 
 		this.tokens.push({ type: TokenType.EOF, value: '', position: this.position });
-		console.log(`Tokenization result:`, this.tokens.map(t => `${t.type}:${t.value}`).join(', '));
+		debugLog(`Tokenization result:`, this.tokens.map(t => `${t.type}:${t.value}`).join(', '));
 		return this.tokens;
 	}
 
@@ -131,7 +152,7 @@ class Lexer {
 			// 处理未闭合的引号
 			const value = this.input.substring(start + 1);
 			this.tokens.push({ type: TokenType.STRING, value, position: start });
-			console.warn(`Unclosed string literal: ${quote}${value}`);
+			debugWarn(`Unclosed string literal: ${quote}${value}`);
 		}
 	}
 
@@ -169,6 +190,12 @@ class Lexer {
 			   this.input[this.position] !== ':') {  // 明确排除冒号
 			value += this.input[this.position];
 			this.position++;
+		}
+		
+		// 检查是否是逻辑操作符
+		if (value === 'AND' || value === 'OR') {
+			this.tokens.push({ type: TokenType.OPERATOR, value: value, position: start });
+			return;
 		}
 		
 		// 处理特殊情况：如果标识符为空但我们仍然需要前进
@@ -239,7 +266,7 @@ class Parser {
 	private parseMatcher(): MatcherExpression {
 		const identifier = this.advance().value;
 		
-		console.log(`Parsing matcher with identifier: ${identifier}`);
+		debugLog(`Parsing matcher with identifier: ${identifier}`);
 		
 		// 处理优先级前缀
 		if (identifier === 'priority' && this.match(TokenType.OPERATOR, ':')) {
@@ -255,14 +282,14 @@ class Parser {
 					const value = this.parseValue();
 					const matcher = new MatcherExpression(nextIdentifier, value);
 					matcher.priority = parseInt(priorityValue);
-					console.log(`Created priority matcher: ${matcher.toString()}`);
+					debugLog(`Created priority matcher: ${matcher.toString()}`);
 					return matcher;
 				}
 				
 				// Legacy support for simple patterns with priority
 				const matcher = new MatcherExpression('url', nextIdentifier);
 				matcher.priority = parseInt(priorityValue);
-				console.log(`Created legacy priority matcher: ${matcher.toString()}`);
+				debugLog(`Created legacy priority matcher: ${matcher.toString()}`);
 				return matcher;
 			}
 			
@@ -273,25 +300,42 @@ class Parser {
 		if (this.match(TokenType.OPERATOR, ':')) {
 			this.advance(); // Consume ':'
 			
-			// 处理特殊格式，如 meta:property:og:title=value
-			let value = this.parseValue();
-			
-			// 检查是否有更多的冒号，用于处理复杂的格式
-			while (this.match(TokenType.OPERATOR, ':') && 
-				  (identifier === 'meta' || identifier === 'schema')) {
-				this.advance(); // Consume ':'
-				const nextValue = this.parseValue();
-				value = value + ':' + nextValue;
+			// 对于meta和schema类型，需要特殊处理，因为它们的值可能包含多个冒号
+			// 例如: meta:og:type=article 或 schema:@Article:name=维基文库
+			if (identifier === 'meta' || identifier === 'schema') {
+				// 收集所有后续的标识符、操作符，直到遇到逻辑操作符、括号或结束
+				let value = '';
+				while (this.position < this.tokens.length) {
+					const token = this.tokens[this.position];
+					
+					// 如果遇到逻辑操作符或括号，停止解析
+					if (token.type === TokenType.OPERATOR && (token.value === '&&' || token.value === '||' || token.value === 'AND' || token.value === 'OR')) {
+						break;
+					}
+					if (token.type === TokenType.LPAREN || token.type === TokenType.RPAREN) {
+						break;
+					}
+					
+					// 收集所有token
+					if (token.type === TokenType.STRING) {
+						value += this.advance().value;
+					} else if (token.type === TokenType.IDENTIFIER) {
+						value += this.advance().value;
+					} else if (token.type === TokenType.OPERATOR) {
+						// 允许所有操作符（冒号、等号等）
+						value += this.advance().value;
+					} else {
+						break;
+					}
+				}
+				
+				debugLog(`Created matcher expression: ${identifier}:${value}`);
+				return new MatcherExpression(identifier, value);
 			}
 			
-			// 处理等号分隔的值
-			if (this.match(TokenType.OPERATOR, '=')) {
-				this.advance(); // Consume '='
-				const equalValue = this.parseValue();
-				value = value + '=' + equalValue;
-			}
-			
-			console.log(`Created matcher expression: ${identifier}:${value}`);
+			// 对于其他类型，使用标准的parseValue()方法
+			const value = this.parseValue();
+			debugLog(`Created matcher expression: ${identifier}:${value}`);
 			return new MatcherExpression(identifier, value);
 		}
 		
@@ -299,12 +343,12 @@ class Parser {
 		const validMatcherTypes = ['url', 'title', 'schema', 'selector', 'meta', 'time'];
 		if (validMatcherTypes.includes(identifier)) {
 			// 这是一个匹配器类型但没有冒号，可能是格式错误
-			console.warn(`Matcher type '${identifier}' found without value. This might be a format error.`);
+			debugWarn(`Matcher type '${identifier}' found without value. This might be a format error.`);
 			throw new Error(`Invalid matcher format: '${identifier}' should be followed by ':' and a value`);
 		}
 		
 		// Legacy support for simple patterns (treat as URL)
-		console.log(`Created legacy URL matcher: ${identifier}`);
+		debugLog(`Created legacy URL matcher: ${identifier}`);
 		return new MatcherExpression('url', identifier);
 	}
 
@@ -313,25 +357,47 @@ class Parser {
 			return this.advance().value;
 		}
 		
-		// 处理带括号的函数调用，如 contains("测试")
-		if (this.match(TokenType.IDENTIFIER) && this.peek().type === TokenType.LPAREN) {
+		// 处理带括号的函数调用，如 contains("测试") 或 between(09:00,18:00)
+		if (this.match(TokenType.IDENTIFIER) && this.position + 1 < this.tokens.length && this.tokens[this.position + 1].type === TokenType.LPAREN) {
 			const funcName = this.advance().value;
 			this.advance(); // Consume '('
 			
 			let args = '';
-			while (!this.match(TokenType.RPAREN) && this.position < this.tokens.length) {
-				if (this.match(TokenType.STRING)) {
+			let depth = 1; // Track nested parentheses
+			
+			while (this.position < this.tokens.length && depth > 0) {
+				const token = this.tokens[this.position];
+				
+				if (token.type === TokenType.LPAREN) {
+					depth++;
+					if (depth > 1) {
+						args += token.value;
+					}
+					this.advance();
+				} else if (token.type === TokenType.RPAREN) {
+					depth--;
+					if (depth > 0) {
+						args += token.value;
+					} else {
+						this.advance(); // Consume final ')'
+					}
+				} else if (token.type === TokenType.STRING) {
 					args += this.advance().value;
-				} else if (this.match(TokenType.IDENTIFIER)) {
+				} else if (token.type === TokenType.IDENTIFIER) {
 					args += this.advance().value;
+				} else if (token.type === TokenType.OPERATOR) {
+					// 允许函数参数中的操作符（如时间格式中的冒号）
+					const op = token.value;
+					if (op === ':' || op === ',' || op === '=' || op === '/' || op === '.' || op === '-') {
+						args += this.advance().value;
+					} else {
+						// 其他操作符停止解析
+						break;
+					}
 				} else {
 					// 跳过其他token
 					this.advance();
 				}
-			}
-			
-			if (this.match(TokenType.RPAREN)) {
-				this.advance(); // Consume ')'
 			}
 			
 			return `${funcName}(${args})`;
@@ -354,11 +420,11 @@ class Parser {
 			else if (token.type === TokenType.IDENTIFIER) {
 				value += this.advance().value;
 			}
-			// 如果是操作符，检查是否是URL的一部分
+			// 如果是操作符，检查是否是URL或Schema的一部分
 			else if (token.type === TokenType.OPERATOR) {
 				const op = token.value;
-				// 允许URL中的特殊字符
-				if (op === ':' || op === '/' || op === '.' || op === '-' || op === '_') {
+				// 允许URL中的特殊字符和Schema中的@符号
+				if (op === ':' || op === '/' || op === '.' || op === '-' || op === '_' || op === '@' || op === '=') {
 					value += this.advance().value;
 				} else {
 					// 其他操作符停止解析
@@ -455,10 +521,10 @@ class MatcherExpression extends Expression {
 	}
 
 	async evaluate(context: MatchContext): Promise<boolean> {
-		console.log(`Evaluating matcher: ${this.toString()}`);
+		debugLog(`Evaluating matcher: ${this.toString()}`);
 		const matcher = createMatcher(this.type, this.value);
 		const result = await matcher.match(context);
-		console.log(`Matcher result: ${result}`);
+		debugLog(`Matcher result: ${result}`);
 		return result;
 	}
 
@@ -545,64 +611,75 @@ class SchemaMatcher implements Matcher {
 				this.schemaType = typePart;
 			}
 			
-			console.log(`Schema matcher parsed: type=${this.schemaType}, key=${this.schemaKey}, value=${this.expectedValue}`);
+			debugLog(`Schema matcher parsed: type=${this.schemaType}, key=${this.schemaKey}, value=${this.expectedValue}`);
 		} else {
 			// 保持原有解析逻辑
-			console.log(`Using default schema pattern parsing for: ${pattern}`);
+			debugLog(`Using default schema pattern parsing for: ${pattern}`);
 		}
 	}
 
 	async match(context: MatchContext): Promise<boolean> {
+		// Input validation - following URLMatcher pattern
 		if (!context.schemaOrgData) {
-			console.warn('Schema matcher: context.schemaOrgData is undefined');
+			debugWarn('SchemaMatcher: context.schemaOrgData is undefined');
 			return false;
 		}
 		
-		// 如果已解析复杂模式，使用自定义匹配逻辑
-		if (this.schemaType && this.schemaKey && this.expectedValue) {
-			console.log(`Matching schema with type=${this.schemaType}, key=${this.schemaKey}, value=${this.expectedValue}`);
-			
-			// 确保schemaOrgData是数组
-			const schemaArray = Array.isArray(context.schemaOrgData) 
-				? context.schemaOrgData 
-				: [context.schemaOrgData];
-			
-			// 扁平化可能的嵌套数组
-			const flatSchemas = schemaArray.flatMap(schema => {
-				return Array.isArray(schema) ? schema : [schema];
-			});
-			
-			console.log(`Found ${flatSchemas.length} schema objects to check`);
-			
-			// 查找匹配的schema对象
-			for (const schema of flatSchemas) {
-				// 检查类型
-				const types = Array.isArray(schema['@type']) ? schema['@type'] : [schema['@type']];
-				if (!types.includes(this.schemaType)) continue;
+		// Handle complex patterns with proper error handling - like URLMatcher's pattern handling
+		try {
+			if (this.schemaType && this.schemaKey && this.expectedValue) {
+				debugLog(`SchemaMatcher: matching complex pattern - type=${this.schemaType}, key=${this.schemaKey}, value=${this.expectedValue}`);
 				
-				// 获取属性值
-				const actualValue = this.getSchemaValue(schema, this.schemaKey);
-				if (actualValue === undefined) continue;
+				// Normalize schema data - similar to URLMatcher's input normalization
+				const schemaArray = Array.isArray(context.schemaOrgData) 
+					? context.schemaOrgData 
+					: [context.schemaOrgData];
 				
-				// 比较值
-				const cleanExpectedValue = this.expectedValue.replace(/^["']|["']$/g, '');
-				if (Array.isArray(actualValue)) {
-					if (actualValue.includes(cleanExpectedValue)) {
-						console.log(`Schema match found: ${this.schemaType}.${this.schemaKey}=${cleanExpectedValue}`);
-						return true;
+				const flatSchemas = schemaArray.flatMap(schema => {
+					return Array.isArray(schema) ? schema : [schema];
+				});
+				
+				debugLog(`SchemaMatcher: found ${flatSchemas.length} schema objects to check`);
+				
+				// Process each schema with error handling
+				for (const schema of flatSchemas) {
+					try {
+						// Type validation
+						const types = Array.isArray(schema['@type']) ? schema['@type'] : [schema['@type']];
+						if (!types.includes(this.schemaType)) continue;
+						
+						// Value extraction
+						const actualValue = this.getSchemaValue(schema, this.schemaKey);
+						if (actualValue === undefined) continue;
+						
+						// Value comparison with normalization - like URLMatcher's clean pattern matching
+						const cleanExpectedValue = this.expectedValue.replace(/^["']|["']$/g, '');
+						if (Array.isArray(actualValue)) {
+							if (actualValue.includes(cleanExpectedValue)) {
+								debugLog(`SchemaMatcher: match found - ${this.schemaType}.${this.schemaKey}=${cleanExpectedValue}`);
+								return true;
+							}
+						} else if (String(actualValue).toLowerCase() === cleanExpectedValue.toLowerCase()) {
+							debugLog(`SchemaMatcher: match found - ${this.schemaType}.${this.schemaKey}=${cleanExpectedValue}`);
+							return true;
+						}
+					} catch (schemaError) {
+						console.error(`SchemaMatcher: error processing individual schema`, schemaError);
+						continue;
 					}
-				} else if (String(actualValue).toLowerCase() === cleanExpectedValue.toLowerCase()) {
-					console.log(`Schema match found: ${this.schemaType}.${this.schemaKey}=${cleanExpectedValue}`);
-					return true;
 				}
+				
+				debugLog('SchemaMatcher: no matching schema found with custom logic');
+				return false;
 			}
 			
-			console.log('No matching schema found with custom logic');
+			// Fallback to legacy pattern matching - like URLMatcher's simple pattern fallback
+			debugLog(`SchemaMatcher: using legacy pattern matching for: ${this.pattern}`);
+			return matchSchemaPattern(this.pattern, context.schemaOrgData);
+		} catch (error) {
+			console.error(`SchemaMatcher error with pattern: ${this.pattern}`, error);
 			return false;
 		}
-		
-		// 使用原有的匹配逻辑
-		return matchSchemaPattern(this.pattern, context.schemaOrgData);
 	}
 	
 	private getSchemaValue(schemaData: any, key: string): any {
@@ -632,37 +709,40 @@ class TitleMatcher implements Matcher {
 	constructor(private pattern: string, private operation: string = 'contains') {}
 
 	async match(context: MatchContext): Promise<boolean> {
-		// 确保标题存在
+		// Input validation - following URLMatcher pattern
 		if (!context.title || typeof context.title !== 'string') {
-			console.warn('Title matcher: context.title is undefined or not a string');
+			debugWarn('Title matcher: context.title is undefined or not a string');
 			return false;
 		}
 
+		// Clean and normalize inputs - following URLMatcher pattern
 		const title = context.title.toLowerCase();
-		// 移除引号，如果存在的话
 		const cleanPattern = this.pattern.replace(/^["']|["']$/g, '').toLowerCase();
 
-		console.log(`TitleMatcher: comparing "${title}" with "${cleanPattern}" using ${this.operation}`);
+		debugLog(`TitleMatcher: comparing "${title}" with "${cleanPattern}" using ${this.operation}`);
 
-		switch (this.operation) {
-			case 'contains':
-				return title.includes(cleanPattern);
-			case 'startsWith':
-				return title.startsWith(cleanPattern);
-			case 'endsWith':
-				return title.endsWith(cleanPattern);
-			case 'regex':
-				try {
+		// Handle different operation types with proper error handling - like URLMatcher's pattern types
+		try {
+			switch (this.operation) {
+				case 'contains':
+					return title.includes(cleanPattern);
+				case 'startsWith':
+					return title.startsWith(cleanPattern);
+				case 'endsWith':
+					return title.endsWith(cleanPattern);
+				case 'regex':
+					// Regex support with error handling - similar to URLMatcher
 					const regex = new RegExp(cleanPattern);
 					return regex.test(context.title);
-				} catch (error) {
-					console.error(`Invalid title regex: ${cleanPattern}`, error);
-					return false;
-				}
-			case 'equals':
-				return title === cleanPattern;
-			default:
-				return title === cleanPattern;
+				case 'equals':
+					return title === cleanPattern;
+				default:
+					// Default fallback - like URLMatcher's simple pattern fallback
+					return title.includes(cleanPattern);
+			}
+		} catch (error) {
+			console.error(`TitleMatcher error with pattern: ${this.pattern}, operation: ${this.operation}`, error);
+			return false;
 		}
 	}
 
@@ -677,13 +757,25 @@ class SelectorMatcher implements Matcher {
 	constructor(private selector: string) {}
 
 	async match(context: MatchContext): Promise<boolean> {
-		if (!context.dom) return false;
-		
+		// Input validation - following URLMatcher pattern
+		if (!context.dom) {
+			debugWarn('SelectorMatcher: context.dom is undefined');
+			return false;
+		}
+
+		if (!this.selector || typeof this.selector !== 'string') {
+			debugWarn('SelectorMatcher: selector is undefined or not a string');
+			return false;
+		}
+
+		// Execute with proper error handling - like URLMatcher's regex handling
 		try {
 			const elements = context.dom.querySelectorAll(this.selector);
-			return elements.length > 0;
+			const result = elements.length > 0;
+			debugLog(`SelectorMatcher: selector "${this.selector}" found ${elements.length} elements`);
+			return result;
 		} catch (error) {
-			console.error(`Invalid selector: ${this.selector}`, error);
+			console.error(`SelectorMatcher error with selector: ${this.selector}`, error);
 			return false;
 		}
 	}
@@ -697,59 +789,68 @@ class MetaMatcher implements Matcher {
 	type = 'meta';
 
 	constructor(private key: string, private value?: string) {
-		// 处理属性格式的meta标签，如meta:property:og:title
-		if (key.includes(':')) {
-			const parts = key.split(':');
-			if (parts.length >= 2) {
-				// 重构key为属性名:属性值格式
-				this.key = parts.slice(1).join(':');
-			}
-		}
-		console.log(`MetaMatcher created with key: "${this.key}", value: "${this.value || 'undefined'}"`);
+		debugLog(`MetaMatcher created with key: "${this.key}", value: "${this.value || 'undefined'}"`);
 	}
 
 	async match(context: MatchContext): Promise<boolean> {
+		// Input validation - following URLMatcher pattern
 		if (!context.meta) {
-			console.warn('Meta matcher: context.meta is undefined');
+			debugWarn('MetaMatcher: context.meta is undefined');
+			return false;
+		}
+
+		if (!this.key || typeof this.key !== 'string') {
+			debugWarn('MetaMatcher: key is undefined or not a string');
 			return false;
 		}
 		
-		console.log(`MetaMatcher: checking key "${this.key}" for value "${this.value || '任意值'}"`);
-		console.log('Available meta tags:', Object.keys(context.meta).join(', '));
+		debugLog(`MetaMatcher: checking key "${this.key}" for value "${this.value || '任意值'}"`);
+		debugLog('Available meta tags:', Object.keys(context.meta).join(', '));
 		
-		// 处理属性格式的meta标签
+		// Handle different key formats with fallbacks - like URLMatcher's pattern handling
 		let metaValue;
-		if (this.key.includes(':')) {
-			// 对于属性格式的meta标签，尝试多种可能的格式
-			const possibleKeys = [
-				this.key,                     // og:title
-				`property:${this.key}`,       // property:og:title
-				`name:${this.key}`,           // name:og:title
-				this.key.replace(':', '_')    // og_title
-			];
-			
-			for (const key of possibleKeys) {
-				if (context.meta[key]) {
-					metaValue = context.meta[key];
-					console.log(`Found meta value for key "${key}": "${metaValue}"`);
-					break;
+		try {
+			if (this.key.includes(':')) {
+				// Support multiple key formats - similar to URLMatcher's wildcard/regex support
+				const possibleKeys = [
+					this.key,                     // og:title
+					`property:${this.key}`,       // property:og:title  
+					`name:${this.key}`,           // name:og:title
+					this.key.replace(':', '_')    // og_title
+				];
+				
+				for (const key of possibleKeys) {
+					if (context.meta[key]) {
+						metaValue = context.meta[key];
+						debugLog(`Found meta value for key "${key}": "${metaValue}"`);
+						break;
+					}
 				}
+			} else {
+				// Simple key lookup - like URLMatcher's simple pattern
+				metaValue = context.meta[this.key];
 			}
-		} else {
-			metaValue = context.meta[this.key];
+		} catch (error) {
+			console.error(`MetaMatcher error processing key: ${this.key}`, error);
+			return false;
 		}
 		
 		if (!metaValue) {
-			console.warn(`Meta value not found for key "${this.key}"`);
+			debugWarn(`Meta value not found for key "${this.key}"`);
 			return false;
 		}
 		
+		// Value comparison with proper handling - following URLMatcher pattern
 		if (this.value) {
-			// 移除引号，如果存在的话
-			const cleanValue = this.value.replace(/^["']|["']$/g, '');
-			const result = metaValue.toLowerCase() === cleanValue.toLowerCase();
-			console.log(`Comparing meta value: "${metaValue}" with "${cleanValue}", result: ${result}`);
-			return result;
+			try {
+				const cleanValue = this.value.replace(/^["']|["']$/g, '');
+				const result = metaValue.toLowerCase() === cleanValue.toLowerCase();
+				debugLog(`Comparing meta value: "${metaValue}" with "${cleanValue}", result: ${result}`);
+				return result;
+			} catch (error) {
+				console.error(`MetaMatcher error comparing values: ${this.value}`, error);
+				return false;
+			}
 		}
 		
 		return true;
@@ -766,35 +867,72 @@ class TimeMatcher implements Matcher {
 	constructor(private condition: string) {}
 
 	async match(context: MatchContext): Promise<boolean> {
+		// Input validation - following URLMatcher pattern
+		if (!this.condition || typeof this.condition !== 'string') {
+			debugWarn('TimeMatcher: condition is undefined or not a string');
+			return false;
+		}
+
 		const now = context.currentTime || new Date();
+		debugLog(`TimeMatcher: evaluating condition "${this.condition}" at ${now.toISOString()}`);
 		
-		// Parse time conditions like "between(09:00,18:00)" or "weekday(monday)"
-		const match = this.condition.match(/(\w+)\(([^)]+)\)/);
-		if (!match) return false;
-		
-		const [, operation, params] = match;
-		
-		switch (operation) {
-			case 'between':
-				const [start, end] = params.split(',').map(p => p.trim());
-				return this.isTimeBetween(now, start, end);
-			case 'weekday':
-				const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-				const targetDay = params.toLowerCase();
-				return weekdays[now.getDay()] === targetDay;
-			default:
+		// Parse time conditions with error handling - like URLMatcher's regex parsing
+		try {
+			const match = this.condition.match(/(\w+)\(([^)]+)\)/);
+			if (!match) {
+				debugWarn(`TimeMatcher: invalid condition format: ${this.condition}`);
 				return false;
+			}
+			
+			const [, operation, params] = match;
+			debugLog(`TimeMatcher: operation="${operation}", params="${params}"`);
+			
+			// Handle different operation types - like URLMatcher's pattern type handling
+			switch (operation) {
+				case 'between':
+					const [start, end] = params.split(',').map(p => p.trim());
+					return this.isTimeBetween(now, start, end);
+				case 'weekday':
+					const targetDay = params.toLowerCase().trim();
+					return this.isWeekday(now, targetDay);
+				default:
+					debugWarn(`TimeMatcher: unknown operation: ${operation}`);
+					return false;
+			}
+		} catch (error) {
+			console.error(`TimeMatcher error with condition: ${this.condition}`, error);
+			return false;
 		}
 	}
 
 	private isTimeBetween(date: Date, start: string, end: string): boolean {
-		const time = date.getHours() * 60 + date.getMinutes();
-		const [startHour, startMin] = start.split(':').map(Number);
-		const [endHour, endMin] = end.split(':').map(Number);
-		const startTime = startHour * 60 + startMin;
-		const endTime = endHour * 60 + endMin;
-		
-		return time >= startTime && time <= endTime;
+		try {
+			const time = date.getHours() * 60 + date.getMinutes();
+			const [startHour, startMin] = start.split(':').map(Number);
+			const [endHour, endMin] = end.split(':').map(Number);
+			const startTime = startHour * 60 + startMin;
+			const endTime = endHour * 60 + endMin;
+			
+			const result = time >= startTime && time <= endTime;
+			debugLog(`TimeMatcher: time ${time} between ${startTime}-${endTime}: ${result}`);
+			return result;
+		} catch (error) {
+			console.error(`TimeMatcher error in isTimeBetween: ${start}-${end}`, error);
+			return false;
+		}
+	}
+
+	private isWeekday(date: Date, targetDay: string): boolean {
+		try {
+			const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+			const currentDay = weekdays[date.getDay()];
+			const result = currentDay === targetDay;
+			debugLog(`TimeMatcher: current day "${currentDay}" matches target "${targetDay}": ${result}`);
+			return result;
+		} catch (error) {
+			console.error(`TimeMatcher error in isWeekday: ${targetDay}`, error);
+			return false;
+		}
 	}
 
 	toString(): string {
@@ -805,7 +943,7 @@ class TimeMatcher implements Matcher {
 // ==================== 匹配器工厂 ====================
 
 function createMatcher(type: string, value: string): Matcher {
-	console.log(`Creating matcher: type=${type}, value=${value}`);
+	debugLog(`Creating matcher: type=${type}, value=${value}`);
 	
 	switch (type) {
 		case 'url':
@@ -814,20 +952,21 @@ function createMatcher(type: string, value: string): Matcher {
 		case 'schema':
 			// 处理复杂的schema格式: schema:@Article:name=维基文库
 			if (value.includes(':') && value.includes('=')) {
-				console.log(`Creating complex schema matcher for: ${value}`);
+				debugLog(`Creating complex schema matcher for: ${value}`);
 				return new SchemaMatcher(value);
 			}
 			return new SchemaMatcher(value);
 			
 		case 'title':
 			// 处理标题操作: contains(text)、regex(/pattern/)等
-			const titleMatch = value.match(/(\w+)\(([^)]+)\)/);
+			// 使用更宽松的正则表达式，支持中文字符和特殊字符
+			const titleMatch = value.match(/([a-zA-Z_][a-zA-Z0-9_]*)\(([^)]+)\)/);
 			if (titleMatch) {
 				const [, operation, pattern] = titleMatch;
-				console.log(`Creating title matcher with operation: ${operation}, pattern: ${pattern}`);
+				debugLog(`Creating title matcher with operation: ${operation}, pattern: ${pattern}`);
 				return new TitleMatcher(pattern, operation);
 			}
-			console.log(`Creating simple title matcher with pattern: ${value}`);
+			debugLog(`Creating simple title matcher with pattern: ${value}`);
 			return new TitleMatcher(value);
 			
 		case 'selector':
@@ -836,18 +975,17 @@ function createMatcher(type: string, value: string): Matcher {
 		case 'meta':
 			// 处理meta标签: property:og:title=维基文库
 			if (value.includes(':')) {
-				const colonPos = value.indexOf(':');
 				const equalsPos = value.indexOf('=');
 				
 				if (equalsPos > 0) {
 					// 有等号，如 property:og:title=维基文库
 					const key = value.substring(0, equalsPos);
 					const val = value.substring(equalsPos + 1);
-					console.log(`Creating meta matcher with key: ${key}, value: ${val}`);
+					debugLog(`Creating meta matcher with key: ${key}, value: ${val}`);
 					return new MetaMatcher(key, val);
 				} else {
 					// 无等号，如 property:og:title
-					console.log(`Creating meta matcher with key: ${value}`);
+					debugLog(`Creating meta matcher with key: ${value}`);
 					return new MetaMatcher(value);
 				}
 			}
@@ -856,18 +994,18 @@ function createMatcher(type: string, value: string): Matcher {
 			const metaMatch = value.match(/([^=]+)=(.+)/);
 			if (metaMatch) {
 				const [, key, val] = metaMatch;
-				console.log(`Creating meta matcher with key: ${key}, value: ${val}`);
+				debugLog(`Creating meta matcher with key: ${key}, value: ${val}`);
 				return new MetaMatcher(key, val);
 			}
 			
-			console.log(`Creating meta matcher with key: ${value}`);
+			debugLog(`Creating meta matcher with key: ${value}`);
 			return new MetaMatcher(value);
 			
 		case 'time':
 			return new TimeMatcher(value);
 			
 		default:
-			console.warn(`Unknown matcher type: ${type}, defaulting to URL matcher`);
+			debugWarn(`Unknown matcher type: ${type}, defaulting to URL matcher`);
 			return new URLMatcher(value);
 	}
 }
@@ -877,19 +1015,19 @@ function createMatcher(type: string, value: string): Matcher {
 class RuleParser {
 	static parse(rule: string): Expression {
 		try {
-			console.log(`Parsing rule: ${rule}`);
+			debugLog(`Parsing rule: ${rule}`);
 			const lexer = new Lexer(rule);
 			const tokens = lexer.tokenize();
 			const parser = new Parser(tokens);
 			const result = parser.parse();
-			console.log(`Successfully parsed rule: ${rule} -> ${result.toString()}`);
+			debugLog(`Successfully parsed rule: ${rule} -> ${result.toString()}`);
 			return result;
 		} catch (error) {
 			console.error(`Failed to parse rule: ${rule}`, error);
 			
 			// 检查是否是简单的URL模式（向后兼容）
 			if (!rule.includes(':') && !rule.includes(' ') && !rule.includes('(') && !rule.includes(')')) {
-				console.log(`Treating as legacy URL pattern: ${rule}`);
+				debugLog(`Treating as legacy URL pattern: ${rule}`);
 				return new MatcherExpression('url', rule);
 			}
 			
@@ -897,7 +1035,7 @@ class RuleParser {
 			const simpleMatcherMatch = rule.match(/^(\w+):(.+)$/);
 			if (simpleMatcherMatch) {
 				const [, type, value] = simpleMatcherMatch;
-				console.log(`Treating as simple matcher: ${type}:${value}`);
+				debugLog(`Treating as simple matcher: ${type}:${value}`);
 				return new MatcherExpression(type, value);
 			}
 			
@@ -915,19 +1053,19 @@ class EnhancedTriggerSystem {
 
 	initialize(templates: Template[]): void {
 		this.rules = [];
-		console.log(`EnhancedTriggerSystem: Initializing with ${templates.length} templates`);
+		debugLog(`EnhancedTriggerSystem: Initializing with ${templates.length} templates`);
 		
 		templates.forEach((template, index) => {
 			if (template.triggers) {
-				console.log(`EnhancedTriggerSystem: Processing template "${template.name}" with ${template.triggers.length} triggers`);
+				debugLog(`EnhancedTriggerSystem: Processing template "${template.name}" with ${template.triggers.length} triggers`);
 				template.triggers.forEach(trigger => {
 					const priority = templates.length - index;
-					console.log(`EnhancedTriggerSystem: Parsing trigger: ${trigger} (priority: ${priority})`);
+					debugLog(`EnhancedTriggerSystem: Parsing trigger: ${trigger} (priority: ${priority})`);
 					
 					try {
 						const expression = RuleParser.parse(trigger);
 						this.rules.push({ template, expression, priority });
-						console.log(`EnhancedTriggerSystem: Successfully added rule: ${expression.toString()} for template "${template.name}"`);
+						debugLog(`EnhancedTriggerSystem: Successfully added rule: ${expression.toString()} for template "${template.name}"`);
 					} catch (error) {
 						console.error(`EnhancedTriggerSystem: Failed to parse trigger "${trigger}" for template "${template.name}":`, error);
 						// 不要添加失败的规则，让系统继续处理其他规则
@@ -937,12 +1075,12 @@ class EnhancedTriggerSystem {
 		});
 
 		this.isInitialized = true;
-		console.log(`EnhancedTriggerSystem: Initialization completed with ${this.rules.length} rules`);
+		debugLog(`EnhancedTriggerSystem: Initialization completed with ${this.rules.length} rules`);
 	}
 
 	async findMatchingTemplate(context: MatchContext): Promise<Template | undefined> {
 		if (!this.isInitialized) {
-			console.warn('Enhanced triggers not initialized. Call initialize first.');
+			debugWarn('Enhanced triggers not initialized. Call initialize first.');
 			return undefined;
 		}
 
@@ -953,7 +1091,7 @@ class EnhancedTriggerSystem {
 			try {
 				const matches = await expression.evaluate(context);
 				if (matches) {
-					console.log(`Template matched: ${template.name} with rule: ${expression.toString()}`);
+					debugLog(`Template matched: ${template.name} with rule: ${expression.toString()}`);
 					return template;
 				}
 			} catch (error) {
@@ -994,7 +1132,7 @@ class Trie {
 			if (!node.children.has(char)) break;
 			node = node.children.get(char)!;
 			if (node.templates.length > 0) {
-				const matchingTemplate = node.templates.find(t => 
+				const matchingTemplate = node.templates.find(() => 
 					memoizedInternalMatchPattern(url.slice(0, url.indexOf(char) + 1), url, schemaOrgData)
 				);
 				if (matchingTemplate) {
@@ -1044,7 +1182,7 @@ const memoizedInternalMatchPattern = memoize(
 );
 
 export function initializeTriggers(templates: Template[]): void {
-	console.log(`Initializing triggers with ${templates.length} templates`);
+	debugLog(`Initializing triggers with ${templates.length} templates`);
 	
 	// 初始化增强系统
 	enhancedSystem.initialize(templates);
@@ -1056,31 +1194,31 @@ export function initializeTriggers(templates: Template[]): void {
 
 	templates.forEach((template, index) => {
 		if (template.triggers) {
-			console.log(`Processing template "${template.name}" with ${template.triggers.length} triggers`);
+			debugLog(`Processing template "${template.name}" with ${template.triggers.length} triggers`);
 			template.triggers.forEach(trigger => {
 				const priority = templates.length - index;
-				console.log(`Processing trigger: ${trigger} (priority: ${priority})`);
+				debugLog(`Processing trigger: ${trigger} (priority: ${priority})`);
 				
 				// 增强系统已经处理了所有触发器，这里只处理旧系统的兼容性
 				if (trigger.startsWith('/') && trigger.endsWith('/')) {
-					console.log(`Adding regex trigger: ${trigger}`);
+					debugLog(`Adding regex trigger: ${trigger}`);
 					regexTriggers.push({ template, regex: new RegExp(trigger.slice(1, -1)), priority });
 				} else if (trigger.startsWith('schema:')) {
-					console.log(`Adding schema trigger: ${trigger}`);
+					debugLog(`Adding schema trigger: ${trigger}`);
 					schemaTriggers.push({ template, pattern: trigger, priority });
 				} else if (!trigger.includes(':') && !trigger.includes(' ') && !trigger.includes('(') && !trigger.includes(')')) {
 					// 只有简单的URL模式才添加到旧系统
-					console.log(`Adding legacy URL trigger: ${trigger}`);
+					debugLog(`Adding legacy URL trigger: ${trigger}`);
 					urlTrie.insert(trigger, template, priority);
 				} else {
-					console.log(`Skipping complex trigger for legacy system: ${trigger} (will be handled by enhanced system)`);
+					debugLog(`Skipping complex trigger for legacy system: ${trigger} (will be handled by enhanced system)`);
 				}
 			});
 		}
 	});
 
 	isInitialized = true;
-	console.log(`Triggers initialization completed. Enhanced system: ${enhancedSystem['rules'].length} rules, Legacy system: ${regexTriggers.length} regex + ${schemaTriggers.length} schema + ${urlTrie.root.children.size} URL patterns`);
+	debugLog(`Triggers initialization completed. Enhanced system: ${enhancedSystem['rules'].length} rules, Legacy system: ${regexTriggers.length} regex + ${schemaTriggers.length} schema + ${urlTrie.root.children.size} URL patterns`);
 }
 
 const memoizedFindMatchingTemplate = memoizeWithExpiration(
@@ -1092,22 +1230,34 @@ const memoizedFindMatchingTemplate = memoizeWithExpiration(
 		meta?: Record<string, string>;
 	}>): Promise<Template | undefined> => {
 		if (!isInitialized) {
-			console.warn('Triggers not initialized. Call initializeTriggers first.');
+			debugWarn('Triggers not initialized. Call initializeTriggers first.');
 			return undefined;
 		}
 
-		console.log(`Finding matching template for URL: ${url}`);
+		debugLog(`Finding matching template for URL: ${url}`);
 		
-		// 获取页面数据
-		const pageData = await getPageData();
+		// 获取页面数据 - 添加错误处理
+		let pageData;
+		try {
+			pageData = await getPageData();
+		} catch (error) {
+			debugError('Error getting page data:', error);
+			return undefined;
+		}
+		
+		if (!pageData) {
+			debugWarn('Page data is null or undefined');
+			return undefined;
+		}
+		
 		const { title = '', description = '', schemaOrgData, dom, meta = {} } = pageData;
 		
-		console.log(`Page data: title="${title}", description="${description.substring(0, 50)}..."`);
-		console.log(`Meta tags:`, Object.keys(meta).join(', '));
+		debugLog(`Page data: title="${title}", description="${description.substring(0, 50)}..."`);
+		debugLog(`Meta tags:`, Object.keys(meta).join(', '));
 		
 		// 获取当前时间
 		const currentTime = new Date();
-		console.log(`Current time: ${currentTime.toLocaleString()}`);
+		debugLog(`Current time: ${currentTime.toLocaleString()}`);
 
 		// 首先尝试增强系统
 		const context: MatchContext = {
@@ -1120,36 +1270,42 @@ const memoizedFindMatchingTemplate = memoizeWithExpiration(
 			currentTime
 		};
 
-		console.log('Trying enhanced trigger system...');
-		const enhancedMatch = await enhancedSystem.findMatchingTemplate(context);
-		if (enhancedMatch) {
-			console.log(`Enhanced match found: ${enhancedMatch.name}`);
-			return enhancedMatch;
+		debugLog('Trying enhanced trigger system...');
+		let enhancedMatch;
+		try {
+			enhancedMatch = await enhancedSystem.findMatchingTemplate(context);
+			if (enhancedMatch) {
+				debugLog(`Enhanced match found: ${enhancedMatch.name}`);
+				return enhancedMatch;
+			}
+		} catch (error) {
+			debugError('Error in enhanced trigger system:', error);
+			// Continue to fallback system
 		}
 
 		// 回退到旧系统
-		console.log('Falling back to legacy trigger system...');
+		debugLog('Falling back to legacy trigger system...');
 		const urlMatch = urlTrie.findLongestMatch(url, schemaOrgData);
 		if (urlMatch) {
-			console.log(`URL match found: ${urlMatch.template.name}`);
+			debugLog(`URL match found: ${urlMatch.template.name}`);
 			return urlMatch.template;
 		}
 
 		for (const { template, pattern } of schemaTriggers) {
 			if (matchSchemaPattern(pattern, schemaOrgData)) {
-				console.log(`Schema match found: ${template.name}`);
+				debugLog(`Schema match found: ${template.name}`);
 				return template;
 			}
 		}
 
 		for (const { template, regex } of regexTriggers) {
 			if (regex.test(url)) {
-				console.log(`Regex match found: ${template.name}`);
+				debugLog(`Regex match found: ${template.name}`);
 				return template;
 			}
 		}
 
-		console.log('No matching template found');
+		debugLog('No matching template found');
 		return undefined;
 	},
 	{
